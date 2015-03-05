@@ -14,7 +14,6 @@ from os import mkdir
 from reddit import getitems
 from HTMLParser import HTMLParser
 from gfycatupdloader import gfycat
-import mediacrush
 
 # Used to extract src from Deviantart URLs
 class DeviantHTMLParser(HTMLParser):
@@ -133,10 +132,11 @@ def download_from_url(url, dest_file):
     # Fix broken filetype descriptors on minus.com
     if ITEM['domain'] == 'i.minus.com' and filetype == 'image%2Fgif; charset=ISO-8859-1':
         filetype = 'image/gif'
-    elif ITEM['domain'] == 'mediacru.sh' and filetype == 'text/html; charset=utf-8':
-        filetype = 'video'
+    elif ITEM['domain'] == 'i.minus.com' and filetype == 'image%2Fjpeg; charset=ISO-8859-1':
+        filetype = 'image/jpeg'
+
     # Only try to download acceptable image types
-    if not filetype in ['image/jpeg', 'image/png', 'image/gif', 'image%2Fgif', 'video/webm', 'video/mp4', 'video', 'image%2Fgif; charset=ISO-8859-1', 'image%2Fjpeg; charset=ISO-8859-1']:
+    if not filetype in ['image/jpeg', 'image/png', 'image/gif', 'image%2Fgif', 'video/webm', 'video/mp4', 'video']:
         raise WrongFileTypeException('WRONG FILE TYPE: %s has type: %s!' % (url, filetype))
 
     filedata = response.read()
@@ -217,18 +217,6 @@ def process_gfycat_url(url):
         url = query.get("webmUrl")
     return [url]
 
-def process_mediacrush_url(url):
-    """
-    Given a mediacrush URL, parse the webm link and return it for downloading.
-    """
-    if 'mediacru.sh' in url:
-        tail = pathsplit(url)[1]
-        query = mediacrush.info(tail)
-        files = query['files'][0]
-        url = files.get("url")
-    return[url]
-
-
 def extract_urls(url):
     """
     Given an URL checks to see if its an imgur.com URL, handles imgur hosted
@@ -245,8 +233,6 @@ def extract_urls(url):
         urls = process_deviant_url(url)
     elif 'gfycat.com' in url:
         urls = process_gfycat_url(url)
-    elif 'mediacru.sh' in url:
-        urls = process_mediacrush_url(url)
     else:
         urls = [url]
 
