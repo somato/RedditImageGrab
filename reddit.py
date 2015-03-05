@@ -11,7 +11,8 @@ def getitems(subreddit, previd=''):
     url = 'http://www.reddit.com/r/%s.json' % subreddit
     # Get items after item with 'id' of previd.
     
-    hdr = { 'User-Agent' : 'RedditImageGrab script.' }
+#    hdr = { 'User-Agent' : 'RedditImageGrab script.' }
+    hdr = { 'User-Agent' : 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0 ' }
     
     if previd:
         url = '%s?after=t3_%s' % (url, previd)
@@ -25,7 +26,7 @@ def getitems(subreddit, previd=''):
         sys.exit(error_message)
     except ValueError as ERROR:
         if ERROR.args[0] == 'No JSON object could be decoded':
-            error_message = 'ERROR: subreddit "%s" does not exist' % (subreddit)
+            error_message = 'ERROR: subreddit "%s" does not exist' % subreddit
             sys.exit(error_message)
         raise ERROR
     return items
