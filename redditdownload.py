@@ -6,6 +6,7 @@ import StringIO
 import logging
 import time
 import urllib
+import string
 from urllib2 import urlopen, HTTPError, URLError
 from httplib import InvalidURL
 from argparse import ArgumentParser
@@ -14,6 +15,7 @@ from os import mkdir
 from reddit import getitems
 from HTMLParser import HTMLParser
 from gfycatupdloader import gfycat
+import imgrush
 
 # Used to extract src from Deviantart URLs
 class DeviantHTMLParser(HTMLParser):
@@ -80,11 +82,39 @@ def extract_imgur_album_urls(album_url):
         if not results:
             continue
 
-        items += results
+        items = results
 
     memfile.close()
 
     urls = ['http://i.imgur.com/%s.jpg' % imghash for imghash in items]
+
+    return urls
+
+
+def extract_gfycat_album_urls(album_url):
+    """
+    Given a gfycat album URL, attempt to extract the gfys within that
+    album
+
+    :rtype : object
+    Returns:
+        List of qualified gfycat URLs
+    """
+    items = []
+    p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
+    m = p.match(album_url)
+    if m != None:
+        user = m.group(1)
+        album = m.group(2)
+        astring = 'username='+user+'&albumUrl='+album
+
+        gfy = gfycat().album(astring)
+        gfyurl = gfy.res[1].values()
+
+        for i in range(0,gfyurl[0].__len__()):
+            gfyurls = gfyurl[0][i]
+            items += [gfyurls["webmUrl"]]
+            urls = items
 
     return urls
 
@@ -126,6 +156,8 @@ def download_from_url(url, dest_file):
         filetype = 'video/webm'
     elif url.endswith('.mp4'):
         filetype = 'video/mp4'
+    elif url.endswith('.gifv'):
+        filetype = 'video/webm'
     else:
         filetype = 'unknown'
 
@@ -134,10 +166,20 @@ def download_from_url(url, dest_file):
         filetype = 'image/gif'
     elif ITEM['domain'] == 'i.minus.com' and filetype == 'image%2Fjpeg; charset=ISO-8859-1':
         filetype = 'image/jpeg'
+    elif ITEM['domain'] == 'imgrush.com' and filetype == 'text/html; charset=utf-8':
+        filetype = 'video'
+    elif 'imgur.com' in ITEM['domain'] and filetype == 'text/html; charset=utf-8':
+	filetype = 'video/webm'
 
     # Only try to download acceptable image types
-    if not filetype in ['image/jpeg', 'image/png', 'image/gif', 'image%2Fgif', 'video/webm', 'video/mp4', 'video']:
+    if not filetype in ['image/jpeg', 'image/png', 'image/gif', 'image%2Fgif', 'image%2Fjpeg', 'video/webm', 'video/mp4', 'video', 'video/gifv']:
         raise WrongFileTypeException('WRONG FILE TYPE: %s has type: %s!' % (url, filetype))
+
+#    if ITEM['domain'] == 'youtu.be' or ITEM['domain'] == 'youtube.com':
+#        try:
+#		subprocess.check_output(["youtube-dl",'-o',dest_file,url])
+#        except subprocess.CalledProcessError, e:
+#            print e.output
 
     filedata = response.read()
     filehandle = open(dest_file, 'wb')
@@ -161,8 +203,10 @@ def process_imgur_url(url):
         url = url.replace('.png', '.jpg')
     elif url.endswith('%2Fgif'):
         url = url.replace('%2Fgif', '.gif')
-    elif url.endswith('.%2Fjpeg'):
+    elif url.endswith('%2Fjpeg'):
         url = url.replace('%2Fjpeg', '.jpg')
+    elif url.endswith('.gifv'):
+	url = url.replace('.gifv', '.webm')
     else:
         # Extract the file extension
         ext = pathsplitext(pathbasename(url))[1]
@@ -211,11 +255,27 @@ def process_gfycat_url(url):
     Returns:
         gfycat webm URL
     """
-    if 'gfycat.com' in url:
-        tail = pathsplit(url)[1]
-        query = gfycat().more(tail)
-        url = query.get("webmUrl")
+    p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
+    m = p.match(url)
+    if m != None:
+        return extract_gfycat_album_urls(url)
+    elif 'gfycat.com' in url:
+          tail = pathsplit(url)[1]
+          query = gfycat().more(tail)
+          url = query.get("webmUrl")
     return [url]
+
+def process_imgrush_url(url):
+
+#    Given a imgrush URL, parse the webm link and return it for downloading.
+
+    if 'imgrush.com' in url:
+        tail = pathsplit(url)[1]
+        query = imgrush.info(tail)
+        files = query['files'][0]
+        url = files.get("url")
+    return[url]
+
 
 def extract_urls(url):
     """
@@ -233,6 +293,11 @@ def extract_urls(url):
         urls = process_deviant_url(url)
     elif 'gfycat.com' in url:
         urls = process_gfycat_url(url)
+    elif 'mediacru.sh' in url:
+        url = url.replace('mediacru.sh','imgrush.com')
+	urls = process_imgrush_url(url)
+    elif 'imgrush.com' in url:
+        urls = process_imgrush_url(url)
     else:
         urls = [url]
 

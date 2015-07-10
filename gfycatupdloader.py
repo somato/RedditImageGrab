@@ -49,6 +49,13 @@ class gfycat(object):
              raise ValueError("%s" % self.json["gfyItem"]["error"])
         return _gfycatMore(result)
 
+    def album(self, param):
+        url="http://gfycat.com"
+        result = self.__fetch(url, "/cajax/getPublicAlbumContents?%s" % param)
+        if "error" in result.json["title"]:
+            raise ValueError("%s" % self.json["title"]["error"])
+        return _gfycatAlbum(result)
+
     def check(self, param):
         url="http://gfycat.com"
         res = self.__fetch(url, "/cajax/checkUrl/%s" % param)
@@ -101,6 +108,13 @@ class _gfycatMore(_gfycatUtils):
     """
     def __init__(self, param):
         super(_gfycatMore, self).__init__(param, param.json["gfyItem"])
+
+class _gfycatAlbum(_gfycatUtils):
+    """
+    This class will provide more information for an existing album
+    """
+    def __init__(self, param):
+        super(_gfycatAlbum, self).__init__(param, param.json["title"])
 
 class _gfycatCheck(_gfycatUtils):
     """
