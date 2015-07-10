@@ -1,19 +1,21 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 """Download images from a reddit.com subreddit."""
 
 import re
-import StringIO
+import io
 import logging
 import time
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import string
-from urllib2 import urlopen, HTTPError, URLError
-from httplib import InvalidURL
+import requests
+from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
+from http.client import InvalidURL
 from argparse import ArgumentParser
 from os.path import exists as pathexists, join as pathjoin, basename as pathbasename, splitext as pathsplitext, split as pathsplit
 from os import mkdir
 from reddit import getitems
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 from gfycatupdloader import gfycat
 import imgrush
 
@@ -64,7 +66,9 @@ def extract_imgur_album_urls(album_url):
     Returns:
         List of qualified imgur URLs
     """
-    album_url = urllib.unquote(album_url).decode('utf8')
+    album_url = urllib.parse.unquote(album_url) #.decode('utf8')
+    r = requests.get(album_url)
+    album_url = r.url
     response = urlopen(album_url)
     info = response.info()
 
@@ -75,7 +79,8 @@ def extract_imgur_album_urls(album_url):
     filedata = response.read()
     match = re.compile(r'\"hash\":\"(.[^\"]*)\"')
     items = []
-    memfile = StringIO.StringIO(filedata)
+    filedata = filedata.decode()
+    memfile = io.StringIO(filedata)
 
     for line in memfile.readlines():
         results = re.findall(match, line)
@@ -109,7 +114,7 @@ def extract_gfycat_album_urls(album_url):
         astring = 'username='+user+'&albumUrl='+album
 
         gfy = gfycat().album(astring)
-        gfyurl = gfy.res[1].values()
+        gfyurl = list(gfy.res[1].values())
 
         for i in range(0,gfyurl[0].__len__()):
             gfyurls = gfyurl[0][i]
@@ -138,13 +143,19 @@ def download_from_url(url, dest_file):
     if pathexists(dest_file):
         raise FileExistsException('URL [%s] already downloaded.' % url)
 
-    url = urllib.unquote(url).encode('utf8')
+#    url = urllib.parse.unquote(url).encode('utf8')
+#    url = urllib.parse.quote_from_bytes(url)
+#    r = requests.get(url)
+#    url = r.url
+
     response = urlopen(url)
-    info = response.info()
+#    t = response.info()["content-type"]
+ #   print(t)
+    info = response.info() #.decode('utf8')
     # self.response.headers['Location'] = urllib.quote(absolute_url.encode("utf-8"))
 
     # Work out file type either from the response or the url.
-    if 'content-type' in info.keys():
+    if 'content-type' in list(info.keys()):
         filetype = info['content-type']
     elif url.endswith('.jpg') or url.endswith('.jpeg'):
         filetype = 'image/jpeg'
@@ -169,7 +180,7 @@ def download_from_url(url, dest_file):
     elif ITEM['domain'] == 'imgrush.com' and filetype == 'text/html; charset=utf-8':
         filetype = 'video'
     elif 'imgur.com' in ITEM['domain'] and filetype == 'text/html; charset=utf-8':
-	filetype = 'video/webm'
+        filetype = 'video/webm'
 
     # Only try to download acceptable image types
     if not filetype in ['image/jpeg', 'image/png', 'image/gif', 'image%2Fgif', 'image%2Fjpeg', 'video/webm', 'video/mp4', 'video', 'video/gifv']:
@@ -206,7 +217,7 @@ def process_imgur_url(url):
     elif url.endswith('%2Fjpeg'):
         url = url.replace('%2Fjpeg', '.jpg')
     elif url.endswith('.gifv'):
-	url = url.replace('.gifv', '.webm')
+        url = url.replace('.gifv', '.webm')
     else:
         # Extract the file extension
         ext = pathsplitext(pathbasename(url))[1]
@@ -217,7 +228,7 @@ def process_imgur_url(url):
     return [url]
 
 
-def  process_deviant_url(url):
+def process_deviant_url(url):
     """
     Given a DeviantArt URL, determine if it's a direct link to an image, or
     a standard DeviantArt Page. If the latter, attempt to acquire Direct link.
@@ -232,6 +243,7 @@ def  process_deviant_url(url):
         # Get Page and parse for image link
         response = urlopen(url)
         filedata = response.read()
+        filedata = filedata.decode()
         parser = DeviantHTMLParser()
         try:
             parser.feed(filedata)
@@ -257,7 +269,7 @@ def process_gfycat_url(url):
     """
     p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
     m = p.match(url)
-    if m != None:
+    if (m != None) and (not 'iframe' in url):
         return extract_gfycat_album_urls(url)
     elif 'gfycat.com' in url:
           tail = pathsplit(url)[1]
@@ -295,7 +307,7 @@ def extract_urls(url):
         urls = process_gfycat_url(url)
     elif 'mediacru.sh' in url:
         url = url.replace('mediacru.sh','imgrush.com')
-	urls = process_imgrush_url(url)
+        urls = process_imgrush_url(url)
     elif 'imgrush.com' in url:
         urls = process_imgrush_url(url)
     else:
@@ -334,7 +346,7 @@ if __name__ == "__main__":
     logger.addHandler(fh)
 
     logger.debug('')
-    print 'Downloading images from "%s" subreddit' % (ARGS.reddit)
+    print('Downloading images from "%s" subreddit' % (ARGS.reddit))
     logger.debug('Downloading images from "%s" subreddit' % (ARGS.reddit))
 
     TOTAL = DOWNLOADED = ERRORS = SKIPPED = FAILED = 0
@@ -363,25 +375,25 @@ if __name__ == "__main__":
 
             if ITEM['score'] < ARGS.score:
                 if ARGS.verbose:
-                    print '    SCORE: %s has score of %s which is lower than required score of %s.' % (ITEM['id'], ITEM['score'], ARGS.score)
+                    print('    SCORE: %s has score of %s which is lower than required score of %s.' % (ITEM['id'], ITEM['score'], ARGS.score))
 
                 SKIPPED += 1
                 continue
             elif ARGS.sfw and ITEM['over_18']:
                 if ARGS.verbose:
-                    print '    NSFW: %s is marked as NSFW.' % (ITEM['id'])
+                    print('    NSFW: %s is marked as NSFW.' % (ITEM['id']))
 
                 SKIPPED += 1
                 continue
             elif ARGS.nsfw and not ITEM['over_18']:
                 if ARGS.verbose:
-                    print '    Not NSFW, skipping %s' % (ITEM['id'])
+                    print('    Not NSFW, skipping %s' % (ITEM['id']))
 
                 SKIPPED += 1
                 continue
             elif ARGS.regex and not re.match(RE_RULE, ITEM['title']):
                 if ARGS.verbose:
-                    print '    Regex match failed'
+                    print('    Regex match failed')
 
                 SKIPPED += 1
                 continue
@@ -390,7 +402,7 @@ if __name__ == "__main__":
             try:
                 URLS = extract_urls(ITEM['url'])
             except HTTPError as ERROR:
-                print '    HTTP ERROR: Code %s. ID = %s.' % (ERROR.code, ITEM['id'])
+                print('    HTTP ERROR: Code %s. ID = %s.' % (ERROR.code, ITEM['id']))
                 logger.debug('    HTTP ERROR: Code %s. ID = %s.' % (ERROR.code, ITEM['id']))
                 FAILED+=1
             for URL in URLS:
@@ -413,7 +425,7 @@ if __name__ == "__main__":
                     download_from_url(URL, FILEPATH)
 
                     # Image downloaded successfully!
-                    print '    Downloaded URL [%s] as [%s].' % (URL, FILENAME)
+                    print('    Downloaded URL [%s] as [%s].' % (URL, FILENAME))
                     logger.debug('    Downloaded URL [%s] as [%s].' % (URL, FILENAME))
                     DOWNLOADED += 1
                     FILECOUNT += 1
@@ -422,28 +434,28 @@ if __name__ == "__main__":
                         FINISHED = True
                         break
                 except WrongFileTypeException as ERROR:
-                    print '    %s' % (ERROR)
+                    print('    %s' % (ERROR))
                     logger.debug('    %s' % (ERROR))
                     SKIPPED += 1
                 except FileExistsException as ERROR:
-                    print '    %s' % (ERROR)
+                    print('    %s' % (ERROR))
                     logger.debug('    %s' % (ERROR))
                     ERRORS += 1
                     if ARGS.update:
-                        print '    Update complete, exiting.'
+                        print('    Update complete, exiting.')
                         logger.debug('    Update complete, exiting.')
                         FINISHED = True
                         break
                 except HTTPError as ERROR:
-                    print '    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id'])
+                    print('    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id']))
                     logger.debug('    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id']))
                     FAILED += 1
                 except URLError as ERROR:
-                    print '    URL ERROR: %s!' % (URL)
+                    print('    URL ERROR: %s!' % (URL))
                     logger.debug('    URL ERROR: %s!' % (URL))
                     FAILED += 1
                 except InvalidURL as ERROR:
-                    print '    Invalid URL: %s!' % (URL)
+                    print('    Invalid URL: %s!' % (URL))
                     logger.debug('    Invalid URL: %s!' % (URL))
                     FAILED += 1
 
@@ -452,5 +464,5 @@ if __name__ == "__main__":
 
         LAST = ITEM['id']
 
-    print 'Downloaded %d files (Processed %d, Skipped %d, Exists %d)' % (DOWNLOADED, TOTAL, SKIPPED, ERRORS)
+    print('Downloaded %d files (Processed %d, Skipped %d, Exists %d)' % (DOWNLOADED, TOTAL, SKIPPED, ERRORS))
     logger.debug('Downloaded %d files (Processed %d, Skipped %d, Exists %d)' % (DOWNLOADED, TOTAL, SKIPPED, ERRORS))

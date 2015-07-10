@@ -22,11 +22,12 @@ class gfycat(object):
         super(gfycat, self).__init__()
 
     def __fetch(self,url, param):
-        import urllib2, json
+        import urllib.request, urllib.error, urllib.parse, json
 #        hdr2 = { 'User-Agent' : 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:28.0) Gecko/20100101 Firefox/28.0' }
-	hdr2 = { 'User-Agent' : 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0' }
-        req = urllib2.Request((url+param), headers=hdr2)
-        connection = urllib2.urlopen(req).read()
+        hdr2 = {'User-Agent' : 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0'}
+        req = urllib.request.Request((url+param), headers=hdr2)
+        connection = urllib.request.urlopen(req).read()
+        connection = connection.decode('utf-8')
         result = namedtuple("result", "raw json")
         return result(raw=connection, json=json.loads(connection))
 
