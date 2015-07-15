@@ -108,7 +108,7 @@ def extract_gfycat_album_urls(album_url):
     items = []
     p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
     m = p.match(album_url)
-    if m != None:
+    if m is not None:
         user = m.group(1)
         album = m.group(2)
         astring = 'username='+user+'&albumUrl='+album
@@ -181,6 +181,8 @@ def download_from_url(url, dest_file):
         filetype = 'video'
     elif 'imgur.com' in ITEM['domain'] and filetype == 'text/html; charset=utf-8':
         filetype = 'video/webm'
+    elif '500px' in ITEM['domain'] and filetype =='unknown':
+        filetype = 'image/jpeg'
 
     # Only try to download acceptable image types
     if not filetype in ['image/jpeg', 'image/png', 'image/gif', 'image%2Fgif', 'image%2Fjpeg', 'video/webm', 'video/mp4', 'video', 'video/gifv']:
@@ -208,6 +210,8 @@ def process_imgur_url(url):
     """
     if ('imgur.com/a/' or 'imgur.com/gallery/') in url:
         return extract_imgur_album_urls(url)
+
+#    url = url.rsplit('?',1)[0]
 
     # Change .png to .jpg for imgur urls.
     if url.endswith('.png'):
@@ -247,12 +251,12 @@ def process_deviant_url(url):
         parser = DeviantHTMLParser()
         try:
             parser.feed(filedata)
-            if parser.IMAGE != None:
+            if parser.IMAGE is not None:
                 return [parser.IMAGE]
             return [url]
         # Exceptions thrown when non-ascii chars are found
         except UnicodeDecodeError as ERROR:
-            if parser.IMAGE != None:
+            if parser.IMAGE is not None:
                 return [parser.IMAGE]
             else:
                 return[url]
@@ -269,7 +273,7 @@ def process_gfycat_url(url):
     """
     p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
     m = p.match(url)
-    if (m != None) and (not 'iframe' in url):
+    if (m is not None) and (not 'iframe' in url):
         return extract_gfycat_album_urls(url)
     elif 'gfycat.com' in url:
           tail = pathsplit(url)[1]
@@ -411,6 +415,8 @@ if __name__ == "__main__":
                     FILEEXT = pathsplitext(URL)[1]
                     if '?' in FILEEXT:
                         FILEEXT = FILEEXT[:FILEEXT.index('?')]
+                    if FILEEXT == '' and '500px' in URL:
+                        FILEEXT = '.jpg'
 
                     # Only append numbers if more than one file.
                     FILENUM = ('_%d' % FILECOUNT if len(URLS) > 1 else '')

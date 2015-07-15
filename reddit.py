@@ -9,7 +9,7 @@ from json import JSONDecoder
 
 def getitems(subreddit, previd=''):
     """Return list of items from a subreddit."""
-    url = 'http://www.reddit.com/r/%s.json' % subreddit
+    url = 'http://www.reddit.com/r/%s/new/.json' % subreddit
     # Get items after item with 'id' of previd.
     
 #    hdr = { 'User-Agent' : 'RedditImageGrab script.' }
