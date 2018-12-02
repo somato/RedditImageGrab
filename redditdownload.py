@@ -341,6 +341,12 @@ def process_webmland_url(url):
 
     return[url]
 
+def process_vreddit_url(url):
+
+    if 'v.redd.it' in url:
+        url = url
+    return [url]
+
 
 def extract_urls(url):
     """
@@ -365,6 +371,8 @@ def extract_urls(url):
         urls = process_imgrush_url(url)
     elif 'webm.land' in url:
         urls = process_webmland_url(url)
+    elif 'v.redd.it' in url:
+        urls = process_vreddit_url(url)
     else:
         urls = [url]
 
@@ -458,7 +466,10 @@ if __name__ == "__main__":
 
             FILECOUNT = 0
             try:
-                URLS = extract_urls(ITEM['url'])
+                if 'v.redd.it' in ITEM['url']:
+                    URLS = extract_urls(ITEM['media']['reddit_video']['fallback_url'])
+                else:
+                    URLS = extract_urls(ITEM['url'])
             except HTTPError as ERROR:
                 print('    HTTP ERROR: Code %s. ID = %s.' % (ERROR.code, ITEM['id']))
                 logger.debug('    HTTP ERROR: Code %s. ID = %s.' % (ERROR.code, ITEM['id']))
@@ -479,6 +490,8 @@ if __name__ == "__main__":
                             FILEEXT = '.jpg'
                         if FILEEXT == '' and 'reddituploads' in URL:
                             FILEEXT = '.jpg'
+                        if FILEEXT == '' and 'v.redd.it' in URL:
+                            FILEEXT = '.mp4'
 
                         # Only append numbers if more than one file.
                         FILENUM = ('_%d' % FILECOUNT if len(URLS) > 1 else '')

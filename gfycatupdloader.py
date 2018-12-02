@@ -44,8 +44,8 @@ class gfycat(object):
         return _gfycatUpload(result)
 
     def more(self, param):
-        url="http://gfycat.com"
-        result = self.__fetch(url, "/cajax/get/%s" % param)
+        url="https://api.gfycat.com"
+        result = self.__fetch(url, "/v1/gfycats/%s" % param)
         if "error" in result.json["gfyItem"]:
              raise ValueError("%s" % self.json["gfyItem"]["error"])
         return _gfycatMore(result)
