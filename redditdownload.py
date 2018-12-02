@@ -18,6 +18,8 @@ from reddit import getitems
 from html.parser import HTMLParser
 from gfycatupdloader import gfycat
 import imgrush
+import redditupload
+#import pudb; pu.db
 
 # Used to extract src from Deviantart URLs
 class DeviantHTMLParser(HTMLParser):
@@ -108,16 +110,19 @@ def extract_gfycat_album_urls(album_url):
     items = []
     p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
     m = p.match(album_url)
-    if m != None:
+    if m is not None:
         user = m.group(1)
         album = m.group(2)
         astring = 'username='+user+'&albumUrl='+album
 
         gfy = gfycat().album(astring)
-        gfyurl = list(gfy.res[1].values())
+#        gfyurl = list(gfy.res[1].values())
+        gfytmp = gfy.res[1]['gfyCount']
 
-        for i in range(0,gfyurl[0].__len__()):
-            gfyurls = gfyurl[0][i]
+#        for i in range(0,gfyurl[0].__len__()):
+        for i in range(0,gfytmp):
+            gfyurls = gfy.res[1]['publishedGfys'][i]
+#            gfyurls = gfyurl[0][i]
             items += [gfyurls["webmUrl"]]
             urls = items
 
@@ -143,19 +148,35 @@ def download_from_url(url, dest_file):
     if pathexists(dest_file):
         raise FileExistsException('URL [%s] already downloaded.' % url)
 
+    time.sleep(2)
+
 #    url = urllib.parse.unquote(url).encode('utf8')
 #    url = urllib.parse.quote_from_bytes(url)
 #    r = requests.get(url)
 #    url = r.url
 
-    response = urlopen(url)
+    if redditupload.match(url):
+        redditupload.download(url, dest_file)
+        return None
+
+
+    try:
+      response = urlopen(url)
+      info = response.info()
+    except:
+      print('** Couldn\'t open URL: %s' % url)
+      return
+      
+
 #    t = response.info()["content-type"]
  #   print(t)
-    info = response.info() #.decode('utf8')
+
+#    info = response.info() #.decode('utf8') - Commented for try block
+
     # self.response.headers['Location'] = urllib.quote(absolute_url.encode("utf-8"))
 
     # Work out file type either from the response or the url.
-    if 'content-type' in list(info.keys()):
+    if 'content-type' or 'Content-Type' in list(info.keys()):
         filetype = info['content-type']
     elif url.endswith('.jpg') or url.endswith('.jpeg'):
         filetype = 'image/jpeg'
@@ -180,6 +201,10 @@ def download_from_url(url, dest_file):
     elif ITEM['domain'] == 'imgrush.com' and filetype == 'text/html; charset=utf-8':
         filetype = 'video'
     elif 'imgur.com' in ITEM['domain'] and filetype == 'text/html; charset=utf-8':
+        filetype = 'video/webm'
+    elif '500px' in ITEM['domain'] and filetype =='unknown':
+        filetype = 'image/jpeg'
+    elif 'webm.land' in ITEM['domain'] and filetype =='unknown':
         filetype = 'video/webm'
 
     # Only try to download acceptable image types
@@ -209,6 +234,8 @@ def process_imgur_url(url):
     if ('imgur.com/a/' or 'imgur.com/gallery/') in url:
         return extract_imgur_album_urls(url)
 
+#    url = url.rsplit('?',1)[0]
+
     # Change .png to .jpg for imgur urls.
     if url.endswith('.png'):
         url = url.replace('.png', '.jpg')
@@ -217,7 +244,7 @@ def process_imgur_url(url):
     elif url.endswith('%2Fjpeg'):
         url = url.replace('%2Fjpeg', '.jpg')
     elif url.endswith('.gifv'):
-        url = url.replace('.gifv', '.webm')
+        url = url.replace('.gifv', '.mp4')
     else:
         # Extract the file extension
         ext = pathsplitext(pathbasename(url))[1]
@@ -247,12 +274,12 @@ def process_deviant_url(url):
         parser = DeviantHTMLParser()
         try:
             parser.feed(filedata)
-            if parser.IMAGE != None:
+            if parser.IMAGE is not None:
                 return [parser.IMAGE]
             return [url]
         # Exceptions thrown when non-ascii chars are found
         except UnicodeDecodeError as ERROR:
-            if parser.IMAGE != None:
+            if parser.IMAGE is not None:
                 return [parser.IMAGE]
             else:
                 return[url]
@@ -267,10 +294,24 @@ def process_gfycat_url(url):
     Returns:
         gfycat webm URL
     """
-    p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')
+    p = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*)\/([\/\w \.-]*)')  # match any gfycat URL
+    q = re.compile('^(?:https?:\/\/[\da-z\.-]+\.[a-z\.]{2,6})\/([\w \.-]*).')  # Match non-album gfycat URL
+    if '@' in url:
+        url = url.replace('@',"")  #  remove @ in username
+    if '/ifr/' in url:
+        url = url.replace('ifr/',"")
+    if '/ru/' in url:
+        url = url.replace('/ru',"")	
+    if '/gifs/detail/' in url:
+        url = url.replace('gifs/detail/',"")
     m = p.match(url)
-    if (m != None) and (not 'iframe' in url):
+    if (m is not None) and (not 'iframe' in url):
         return extract_gfycat_album_urls(url)
+    elif 'thumbs.gfycat.com' in url:
+        if url.endswith('.jpg'):
+            url = url.replace('thumb100.jpg', 'mobile.mp4')
+        elif url.endswith('.mp4'):
+            url = url
     elif 'gfycat.com' in url:
           tail = pathsplit(url)[1]
           query = gfycat().more(tail)
@@ -286,6 +327,18 @@ def process_imgrush_url(url):
         query = imgrush.info(tail)
         files = query['files'][0]
         url = files.get("url")
+    return[url]
+
+
+def process_webmland_url(url):
+
+    if 'webm.land/w/' in url:
+        baseurl = 'http://webm.land/media/'
+        url = url.split('/w/')
+        url = url[1].split('/')
+        url = url[0]
+        url = baseurl + url + '.webm'
+
     return[url]
 
 
@@ -310,6 +363,8 @@ def extract_urls(url):
         urls = process_imgrush_url(url)
     elif 'imgrush.com' in url:
         urls = process_imgrush_url(url)
+    elif 'webm.land' in url:
+        urls = process_webmland_url(url)
     else:
         urls = [url]
 
@@ -373,6 +428,9 @@ if __name__ == "__main__":
             TOTAL += 1
             IDENTIFIER = ITEM['title'].replace('/', '\'').replace('"', '\'').replace('*', '\'').replace(':', '-').replace('?', '\'').replace('|', '-').replace('\\', '\'').replace('>','\'').replace('<','\'').replace('\n','-').replace('\t','-')
 
+            if 'reddit.com/r/' + ARGS.reddit + '/comments/' in ITEM['url']:
+                continue
+
             if ITEM['score'] < ARGS.score:
                 if ARGS.verbose:
                     print('    SCORE: %s has score of %s which is lower than required score of %s.' % (ITEM['id'], ITEM['score'], ARGS.score))
@@ -406,58 +464,80 @@ if __name__ == "__main__":
                 logger.debug('    HTTP ERROR: Code %s. ID = %s.' % (ERROR.code, ITEM['id']))
                 FAILED+=1
             for URL in URLS:
-                try:
-                    # Trim any http query off end of file extension.
-                    FILEEXT = pathsplitext(URL)[1]
-                    if '?' in FILEEXT:
-                        FILEEXT = FILEEXT[:FILEEXT.index('?')]
+                if URL is not None:
+                    if URL.find("&amp;") != -1:  # if found a &amp;
+                        URL = URL.replace("&amp;", "&")
+                    if '@' in URL:
+                        if 'gfycat' in URL:
+                            URL=URL.replace('@',"")
+                    try:
+                        # Trim any http query off end of file extension.
+                        FILEEXT = pathsplitext(URL)[1]
+                        if '?' in FILEEXT:
+                            FILEEXT = FILEEXT[:FILEEXT.index('?')]
+                        if FILEEXT == '' and '500px' in URL:
+                            FILEEXT = '.jpg'
+                        if FILEEXT == '' and 'reddituploads' in URL:
+                            FILEEXT = '.jpg'
 
-                    # Only append numbers if more than one file.
-                    FILENUM = ('_%d' % FILECOUNT if len(URLS) > 1 else '')
-                    FILENAME = '%s%s%s%s%s' % (ITEM['id'], ' - ', IDENTIFIER, FILENUM, FILEEXT)
-                    FILEPATH = pathjoin(ARGS.dir, FILENAME)
+                        # Only append numbers if more than one file.
+                        FILENUM = ('_%d' % FILECOUNT if len(URLS) > 1 else '')
+                        FILENAME = '%s%s%s%s%s' % (ITEM['id'], ' - ', IDENTIFIER, FILENUM, FILEEXT)
+                        FILEPATH = pathjoin(ARGS.dir, FILENAME)
 
-#                    # Improve debuggability list URL before download too.
-#                    print '    Attempting to download URL [%s] as [%s].' % (
-#                        URL.encode('utf-8'), FILENAME.encode('utf-8'))
+    #                    # Improve debuggability list URL before download too.
+    #                    print '    Attempting to download URL [%s] as [%s].' % (
+    #                        URL.encode('utf-8'), FILENAME.encode('utf-8'))
 
-                    # Download the image
-                    download_from_url(URL, FILEPATH)
+                        # Download the image
+    #                    try:
+                        download_from_url(URL, FILEPATH)
 
-                    # Image downloaded successfully!
-                    print('    Downloaded URL [%s] as [%s].' % (URL, FILENAME))
-                    logger.debug('    Downloaded URL [%s] as [%s].' % (URL, FILENAME))
-                    DOWNLOADED += 1
-                    FILECOUNT += 1
-                    time.sleep(2)
-                    if 0 < ARGS.num <= DOWNLOADED:
-                        FINISHED = True
-                        break
-                except WrongFileTypeException as ERROR:
-                    print('    %s' % (ERROR))
-                    logger.debug('    %s' % (ERROR))
-                    SKIPPED += 1
-                except FileExistsException as ERROR:
-                    print('    %s' % (ERROR))
-                    logger.debug('    %s' % (ERROR))
-                    ERRORS += 1
-                    if ARGS.update:
-                        print('    Update complete, exiting.')
-                        logger.debug('    Update complete, exiting.')
-                        FINISHED = True
-                        break
-                except HTTPError as ERROR:
-                    print('    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id']))
-                    logger.debug('    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id']))
-                    FAILED += 1
-                except URLError as ERROR:
-                    print('    URL ERROR: %s!' % (URL))
-                    logger.debug('    URL ERROR: %s!' % (URL))
-                    FAILED += 1
-                except InvalidURL as ERROR:
-                    print('    Invalid URL: %s!' % (URL))
-                    logger.debug('    Invalid URL: %s!' % (URL))
-                    FAILED += 1
+                            # Image downloaded successfully!
+                        print('    Downloaded URL [%s] as [%s].' % (URL, FILENAME))
+                        logger.debug('    Downloaded URL [%s] as [%s].' % (URL, FILENAME))
+                        DOWNLOADED += 1
+                        FILECOUNT += 1
+
+    #                    except Exception as e:
+#                            print('    %s' % str(e))
+#                            ERRORS += 1
+
+                        time.sleep(2)
+                        if 0 < ARGS.num <= DOWNLOADED:
+                            FINISHED = True
+                            break
+                    except WrongFileTypeException as ERROR:
+                        print('    %s' % (ERROR))
+                        logger.debug('    %s' % (ERROR))
+                        SKIPPED += 1
+                    except FileExistsException as ERROR:
+                        print('    %s' % (ERROR))
+                        logger.debug('    %s' % (ERROR))
+                        ERRORS += 1
+                        if ARGS.update:
+                            print('    Update complete, exiting.')
+                            logger.debug('    Update complete, exiting.')
+                            FINISHED = True
+                            break
+                    except HTTPError as ERROR:
+                        print('    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id']))
+                        logger.debug('    HTTP ERROR: Code %s for %s. ID = %s' % (ERROR.code, URL, ITEM['id']))
+                        FAILED += 1
+                    except URLError as ERROR:
+                        print('    URL ERROR: %s!' % (URL))
+                        logger.debug('    URL ERROR: %s!' % (URL))
+                        FAILED += 1
+                    except InvalidURL as ERROR:
+                        print('    Invalid URL: %s!' % (URL))
+                        logger.debug('    Invalid URL: %s!' % (URL))
+                        FAILED += 1
+
+                else:
+                    print('*** URL not valid - Title: %s' % ITEM['title'])
+                    print('*** LINK: %s' % ITEM['permalink'])
+                    print('*** URL = %s' % ITEM['url'])
+
 
             if FINISHED:
                 break

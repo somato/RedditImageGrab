@@ -9,11 +9,11 @@ from json import JSONDecoder
 
 def getitems(subreddit, previd=''):
     """Return list of items from a subreddit."""
-    url = 'http://www.reddit.com/r/%s.json' % subreddit
+    url = 'http://www.reddit.com/r/%s/new/.json' % subreddit
     # Get items after item with 'id' of previd.
     
 #    hdr = { 'User-Agent' : 'RedditImageGrab script.' }
-    hdr = {'User-Agent' : 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0 '}
+    hdr = {'User-Agent' : 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:56.0) Gecko/20100101 Firefox/56.0 '}
     
     if previd:
         url = '%s?after=t3_%s' % (url, previd)
